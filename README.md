@@ -89,7 +89,7 @@ compressed so a demo run is watchable in minutes instead of days.
 
 | Provider | Port | Implemented |
 |---|---|---|
-| fake-gmail | 2525 | *(planned)* greylisting (421 4.7.0), rate limit (421 4.7.28), hard bounce (550 5.1.1), spam-folder placement for recently-limited senders, `- gsmtp` marker |
+| fake-gmail | 2525 | greylisting (421 4.7.0), rate limit (421 4.7.28), hard bounce (550 5.1.1), spam-folder placement for recently-limited senders, `- gsmtp` marker |
 | fake-outlook | 2526 | *(planned)* low concurrent-connection limit (421 4.3.2), reputation rate limits (451 4.7.650), mid-session drops |
 | fake-yahoo | 2527 | *(planned)* TSS04 volume deferrals, TSS11 permanent-in-disguise, slow responses |
 
@@ -97,8 +97,8 @@ compressed so a demo run is watchable in minutes instead of days.
 
 ```sh
 docker compose up -d        # RabbitMQ (+ management UI at :15672)
-npm install
-npm run dev                 # api :3000, mta consumer, fake-gmail :2525
+pnpm install
+pnpm dev                    # api :3000, mta consumer, fake-gmail :2525
 ```
 
 Send something:
@@ -117,13 +117,13 @@ hard bounce and suppression.
 Standalone greylisting demo (no RabbitMQ needed):
 
 ```sh
-npx tsx smoke.ts
+pnpm tsx src/providers/smoke.ts
 ```
 
 ## Tests
 
 ```sh
-npm test
+pnpm test
 ```
 
 The classifier suite covers the fun cases: TSS11 (text overrides code),
@@ -132,7 +132,7 @@ dropped connections.
 
 ## Implementation plan
 
-- [ ] Phase 1: api + queue + mta + fake-gmail (greylisting, rate limit,
+- [x] Phase 1: api + queue + mta + fake-gmail (greylisting, rate limit,
       hard bounce, spam placement) + classifier with tests
 - [ ] Phase 2: fake-outlook and fake-yahoo personalities
 - [ ] Phase 3: per-IP reputation score consulted by providers; warmup demo
