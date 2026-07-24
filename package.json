@@ -1,8 +1,7 @@
 {
   "name": "mta-playground",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A toy MTA that takes email delivery seriously",
   "directories": {
     "test": "test"
   },
@@ -14,8 +13,8 @@
     "dev": "concurrently -n api,mta,gmail -c blue,green,yellow \"npm:api\" \"npm:mta\" \"npm:gmail\""
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Rubens Shoji",
+  "license": "MIT",
   "packageManager": "pnpm@11.12.0",
   "type": "module",
   "dependencies": {
