@@ -1,0 +1,69 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.5/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": false
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 80
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "correctness": {
+        "useUniqueElementIds": "off",
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error",
+        "useExhaustiveDependencies": "off",
+        "useHookAtTopLevel": "off"
+      },
+      "complexity": {
+        "noUselessSwitchCase": "off",
+        "noBannedTypes": "off",
+        "noUselessFragments": "off"
+      },
+      "suspicious": {
+        "noUnknownAtRules": "off",
+        "noImplicitAnyLet": "off",
+        "noExplicitAny": "off",
+        "noAssignInExpressions": "off",
+        "noArrayIndexKey": "off",
+        "noFallthroughSwitchClause": "off",
+        "noPrototypeBuiltins": "off",
+        "useDefaultSwitchClauseLast": "off",
+        "noCommentText": "off",
+        "noConsole": "off"
+      },
+      "style": {
+        "noNonNullAssertion": "off",
+        "useSingleVarDeclarator": "off",
+        "noParameterAssign": "off",
+        "noDescendingSpecificity": "off"
+      },
+      "performance": {
+        "noAccumulatingSpread": "off",
+        "noDynamicNamespaceImportAccess": "off"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single"
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
+}

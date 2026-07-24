@@ -10,7 +10,9 @@
     "api": "tsx src/api/index.ts",
     "mta": "tsx src/mta/index.ts",
     "gmail": "tsx src/providers/fake-gmail.ts",
-    "dev": "concurrently -n api,mta,gmail -c blue,green,yellow \"npm:api\" \"npm:mta\" \"npm:gmail\""
+    "dev": "concurrently -n api,mta,gmail -c blue,green,yellow \"npm:api\" \"npm:mta\" \"npm:gmail\"",
+    "lint": "biome check .",
+    "lint:fix": "biome check . --write"
   },
   "keywords": [],
   "author": "Rubens Shoji",
@@ -25,6 +27,7 @@
     "smtp-server": "3.19.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.5",
     "@types/amqplib": "0.10.8",
     "@types/node": "26.1.1",
     "@types/nodemailer": "8.0.1",
