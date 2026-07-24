@@ -55,3 +55,91 @@ compressed so a demo run is watchable in minutes instead of days.
 
 **MTA design (further reading)**
 - [KumoMTA docs](https://docs.kumomta.com) — modern open-source MTA in Rust; queue strategy and traffic shaping
+
+## Proposal / Architecture
+
+```
+             control plane                      data plane
+┌────────┐   ┌─────────┐   ┌──────────┐   ┌─────────────────┐
+│ client │ → │  api    │ → │ RabbitMQ │ → │  mta consumer   │
+└────────┘   │ (Hono)  │   │ outbound │   │ route→deliver→  │
+             └─────────┘   └──────────┘   │ classify→retry  │
+                                ↑         └───────┬─────────┘
+                                │ TTL dead-letter │ SMTP
+                          ┌─────┴─────┐   ┌───────┴─────────┐
+                          │ retry.Ns  │   │ fake-gmail :2525│
+                          │ queues    │   │ fake-outlook ...│
+                          └───────────┘   └─────────────────┘
+```
+
+- **API never talks SMTP.** A provider slowdown can't block ingestion; the
+  queue absorbs spikes. (Control plane / data plane separation.)
+- **Retries are TTL dead-letter queues.** A deferred message sits in
+  `emails.retry.30s` until RabbitMQ dead-letters it back to the outbound
+  queue. No sleeping workers, no polling.
+- **Classification reads the text, not just the code.** Yahoo's TSS11
+  arrives as a 553 whose text says "Retrying will NOT succeed" (permanent).
+  Outlook's 554 5.2.122 is a per-hour limit (retriable). Providers
+  contradict their own codes; the classifier knows.
+- **Suppression is recipient-level only.** A 5.7.x reputation block means
+  the sender is the problem, not the address — suppressing it would be a
+  bug. See `shouldSuppress()`.
+
+## Provider behaviors
+
+| Provider | Port | Implemented |
+|---|---|---|
+| fake-gmail | 2525 | *(planned)* greylisting (421 4.7.0), rate limit (421 4.7.28), hard bounce (550 5.1.1), spam-folder placement for recently-limited senders, `- gsmtp` marker |
+| fake-outlook | 2526 | *(planned)* low concurrent-connection limit (421 4.3.2), reputation rate limits (451 4.7.650), mid-session drops |
+| fake-yahoo | 2527 | *(planned)* TSS04 volume deferrals, TSS11 permanent-in-disguise, slow responses |
+
+## Running
+
+```sh
+docker compose up -d        # RabbitMQ (+ management UI at :15672)
+npm install
+npm run dev                 # api :3000, mta consumer, fake-gmail :2525
+```
+
+Send something:
+
+```sh
+curl -X POST localhost:3000/send \
+  -H 'Content-Type: application/json' \
+  -d '{"from":"me@example.test","to":"user@fake-gmail.test","subject":"hello"}'
+```
+
+Watch the MTA logs: first attempt gets greylisted (421), the retry is
+scheduled with jittered exponential backoff, and the next attempt after the
+greylist window is accepted. Try `to: "unknown1@fake-gmail.test"` for a
+hard bounce and suppression.
+
+Standalone greylisting demo (no RabbitMQ needed):
+
+```sh
+npx tsx smoke.ts
+```
+
+## Tests
+
+```sh
+npm test
+```
+
+The classifier suite covers the fun cases: TSS11 (text overrides code),
+Outlook per-hour 554 (transient despite 5xx), 5.7.x non-suppression, and
+dropped connections.
+
+## Implementation plan
+
+- [ ] Phase 1: api + queue + mta + fake-gmail (greylisting, rate limit,
+      hard bounce, spam placement) + classifier with tests
+- [ ] Phase 2: fake-outlook and fake-yahoo personalities
+- [ ] Phase 3: per-IP reputation score consulted by providers; warmup demo
+- [ ] Phase 4: live dashboard (queues, attempts, outcomes, inbox vs spam)
+
+## Open questions
+
+- Should reputation be per-IP, per-domain, or both? (Real providers weigh
+  domain reputation increasingly more.)
+- How far to take TLS simulation (STARTTLS negotiation, cert failures)?
