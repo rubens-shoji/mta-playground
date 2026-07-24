@@ -12,7 +12,8 @@
     "gmail": "tsx src/providers/fake-gmail.ts",
     "dev": "concurrently -n api,mta,gmail -c blue,green,yellow \"npm:api\" \"npm:mta\" \"npm:gmail\"",
     "lint": "biome check .",
-    "lint:fix": "biome check . --write"
+    "lint:fix": "biome check . --write",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "Rubens Shoji",
