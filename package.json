@@ -7,9 +7,9 @@
   },
   "scripts": {
     "test": "vitest run",
-    "api": "tsx src/api/index.ts",
-    "mta": "tsx src/mta/index.ts",
-    "gmail": "tsx src/providers/fake-gmail.ts",
+    "api": "tsx --env-file=.env src/api/index.ts",
+    "mta": "tsx --env-file=.env src/mta/index.ts",
+    "gmail": "tsx --env-file=.env src/providers/fake-gmail.ts",
     "dev": "concurrently -n api,mta,gmail -c blue,green,yellow \"npm:api\" \"npm:mta\" \"npm:gmail\"",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
