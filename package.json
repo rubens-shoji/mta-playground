@@ -11,7 +11,8 @@
     "mta": "tsx --env-file=.env src/mta/index.ts",
     "gmail": "tsx --env-file=.env src/providers/fake-gmail.ts",
     "outlook": "tsx --env-file=.env src/providers/fake-outlook.ts",
-    "dev": "concurrently -n api,mta,gmail,outlook -c blue,green,yellow,magenta \"npm:api\" \"npm:mta\" \"npm:gmail\" \"npm:outlook\"",
+    "yahoo": "tsx --env-file=.env src/providers/fake-yahoo.ts",
+    "dev": "concurrently -n api,mta,gmail,outlook,yahoo -c blue,green,yellow,magenta,cyan \"npm:api\" \"npm:mta\" \"npm:gmail\" \"npm:outlook\" \"npm:yahoo\"",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "typecheck": "tsc --noEmit"
