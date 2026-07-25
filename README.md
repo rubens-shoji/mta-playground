@@ -146,3 +146,7 @@ dropped connections.
 - Should reputation be per-IP, per-domain, or both? (Real providers weigh
   domain reputation increasingly more.)
 - How far to take TLS simulation (STARTTLS negotiation, cert failures)?
+
+---
+
+Built to learn. Honestly, what would I do without you, @claude? lol
