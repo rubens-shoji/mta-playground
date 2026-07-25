@@ -135,8 +135,11 @@ dropped connections.
 - [x] Phase 1: api + queue + mta + fake-gmail (greylisting, rate limit,
       hard bounce, spam placement) + classifier with tests
 - [x] Phase 2: fake-outlook and fake-yahoo personalities
-- [ ] Phase 3: per-IP reputation score consulted by providers; warmup demo
-- [ ] Phase 4: live dashboard (queues, attempts, outcomes, inbox vs spam)
+- [ ] Phase 3: persistence with Postgres + Drizzle — store messages and
+      delivery attempts, tracking execution status per message (queued,
+      deferred, delivered, bounced, suppressed)
+- [ ] Phase 4: per-IP reputation score consulted by providers; warmup demo
+- [ ] Phase 5: live dashboard (queues, attempts, outcomes, inbox vs spam)
 
 ## Open questions
 
