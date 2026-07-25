@@ -90,15 +90,15 @@ compressed so a demo run is watchable in minutes instead of days.
 | Provider | Port | Implemented |
 |---|---|---|
 | fake-gmail | 2525 | greylisting (421 4.7.0), rate limit (421 4.7.28), hard bounce (550 5.1.1), spam-folder placement for recently-limited senders, `- gsmtp` marker |
-| fake-outlook | 2526 | *(planned)* low concurrent-connection limit (421 4.3.2), reputation rate limits (451 4.7.650), mid-session drops |
-| fake-yahoo | 2527 | *(planned)* TSS04 volume deferrals, TSS11 permanent-in-disguise, slow responses |
+| fake-outlook | 2526 | low concurrent-connection limit (421 4.3.2), reputation rate limit (451 4.7.650), mid-session drops for `drop*` recipients |
+| fake-yahoo | 2527 | slow responses, TSS04 volume deferrals (421), TSS11 permanent-in-disguise (553) for `spammer*` senders |
 
 ## Running
 
 ```sh
 docker compose up -d        # RabbitMQ (+ management UI at :15672)
 pnpm install
-pnpm dev                    # api :3000, mta consumer, fake-gmail :2525
+pnpm dev                    # api :3000, mta consumer, providers :2525-2527
 ```
 
 Send something:
@@ -134,7 +134,7 @@ dropped connections.
 
 - [x] Phase 1: api + queue + mta + fake-gmail (greylisting, rate limit,
       hard bounce, spam placement) + classifier with tests
-- [ ] Phase 2: fake-outlook and fake-yahoo personalities
+- [x] Phase 2: fake-outlook and fake-yahoo personalities
 - [ ] Phase 3: per-IP reputation score consulted by providers; warmup demo
 - [ ] Phase 4: live dashboard (queues, attempts, outcomes, inbox vs spam)
 
