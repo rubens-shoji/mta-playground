@@ -10,7 +10,8 @@
     "api": "tsx --env-file=.env src/api/index.ts",
     "mta": "tsx --env-file=.env src/mta/index.ts",
     "gmail": "tsx --env-file=.env src/providers/fake-gmail.ts",
-    "dev": "concurrently -n api,mta,gmail -c blue,green,yellow \"npm:api\" \"npm:mta\" \"npm:gmail\"",
+    "outlook": "tsx --env-file=.env src/providers/fake-outlook.ts",
+    "dev": "concurrently -n api,mta,gmail,outlook -c blue,green,yellow,magenta \"npm:api\" \"npm:mta\" \"npm:gmail\" \"npm:outlook\"",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "typecheck": "tsc --noEmit"
