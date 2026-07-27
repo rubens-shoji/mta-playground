@@ -4,3 +4,17 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"   # management UI (guest/guest)
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: kodimperi
+      POSTGRES_DB: mta
+    ports:
+      - "5433:5432"   # 5433 on the host to avoid clashing with a local postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
