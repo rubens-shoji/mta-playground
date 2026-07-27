@@ -70,6 +70,13 @@ compressed so a demo run is watchable in minutes instead of days.
                           │ retry.Ns  │   │ fake-gmail :2525│
                           │ queues    │   │ fake-outlook ...│
                           └───────────┘   └─────────────────┘
+
+              persistence (event-driven, single writer)
+┌──────────┐         ┌───────────────┐   ┌────────┐   ┌──────────┐
+│ api, mta │ ──────→ │ emails.events │ → │ writer │ → │ Postgres │
+└──────────┘ status  └───────────────┘   └────────┘   └────┬─────┘
+              events                                       │ reads
+                          api (GET /messages), mta (suppression list)
 ```
 
 - **API never talks SMTP.** A provider slowdown can't block ingestion; the
@@ -84,6 +91,11 @@ compressed so a demo run is watchable in minutes instead of days.
 - **Suppression is recipient-level only.** A 5.7.x reputation block means
   the sender is the problem, not the address — suppressing it would be a
   bug. See `shouldSuppress()`.
+- **Writes are events, not queries.** The API and MTA never write to
+  Postgres on the hot path: they publish status events to `emails.events`
+  and the writer process (the only DB writer) does the bookkeeping. A
+  Postgres outage delays history, not delivery. One queue, one consumer →
+  FIFO, so an attempt never arrives before its message row.
 
 ## Provider behaviors
 
@@ -96,9 +108,10 @@ compressed so a demo run is watchable in minutes instead of days.
 ## Running
 
 ```sh
-docker compose up -d        # RabbitMQ (+ management UI at :15672)
+docker compose up -d        # RabbitMQ (:15672 UI) + Postgres (:5433)
 pnpm install
-pnpm dev                    # api :3000, mta consumer, providers :2525-2527
+pnpm db:push                # create the tables
+pnpm dev                    # api :3000, mta, writer, providers :2525-2527
 ```
 
 Send something:
@@ -113,6 +126,14 @@ Watch the MTA logs: first attempt gets greylisted (421), the retry is
 scheduled with jittered exponential backoff, and the next attempt after the
 greylist window is accepted. Try `to: "unknown1@fake-gmail.test"` for a
 hard bounce and suppression.
+
+Then check the persisted execution status — the full attempt history,
+including every 421 and the raw provider responses:
+
+```sh
+curl localhost:3000/messages          # latest 50, status only
+curl localhost:3000/messages/<id>     # one message + its delivery attempts
+```
 
 Standalone greylisting demo (no RabbitMQ needed):
 
@@ -135,7 +156,7 @@ dropped connections.
 - [x] Phase 1: api + queue + mta + fake-gmail (greylisting, rate limit,
       hard bounce, spam placement) + classifier with tests
 - [x] Phase 2: fake-outlook and fake-yahoo personalities
-- [ ] Phase 3: persistence with Postgres + Drizzle — store messages and
+- [x] Phase 3: persistence with Postgres + Drizzle — store messages and
       delivery attempts, tracking execution status per message (queued,
       deferred, delivered, bounced, suppressed)
 - [ ] Phase 4: per-IP reputation score consulted by providers; warmup demo
