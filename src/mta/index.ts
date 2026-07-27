@@ -1,9 +1,14 @@
 import amqp from 'amqplib';
+import { eq } from 'drizzle-orm';
 import nodemailer from 'nodemailer';
+import { db } from '../db/client.js';
+import { suppressions } from '../db/schema.js';
 import {
   type OutboundEmail,
+  QUEUE_EVENTS,
   QUEUE_OUTBOUND,
   QUEUE_RETRY_PREFIX,
+  type StatusEvent,
 } from '../shared/types.js';
 import { classify, shouldSuppress } from './classifier.js';
 import { nextDelaySeconds, policyFor } from './retry.js';
@@ -17,6 +22,11 @@ import { nextDelaySeconds, policyFor } from './retry.js';
  * published to a per-delay retry queue whose only consumer is time itself —
  * when the TTL expires, RabbitMQ dead-letters it back into the outbound
  * queue. No sleeping workers, no polling.
+ *
+ * Persistence is event-driven: every attempt becomes a delivery.attempted
+ * event on emails.events; the writer process does the actual DB writes, so
+ * the hot path never blocks on Postgres. The suppression list is the one
+ * thing read from the DB here, before dialing.
  */
 
 const AMQP_URL = process.env.AMQP_URL ?? 'amqp://guest:guest@localhost:5672';
@@ -41,12 +51,17 @@ const ROUTES: Record<string, { provider: string; host: string; port: number }> =
     },
   };
 
-const suppression = new Set<string>();
-
 const conn = await amqp.connect(AMQP_URL);
 const ch = await conn.createChannel();
 await ch.assertQueue(QUEUE_OUTBOUND, { durable: true });
+await ch.assertQueue(QUEUE_EVENTS, { durable: true });
 ch.prefetch(5);
+
+function publishEvent(event: StatusEvent) {
+  ch.sendToQueue(QUEUE_EVENTS, Buffer.from(JSON.stringify(event)), {
+    persistent: true,
+  });
+}
 
 async function scheduleRetry(email: OutboundEmail, delaySeconds: number) {
   const queue = `${QUEUE_RETRY_PREFIX}${delaySeconds}s`;
@@ -61,6 +76,14 @@ async function scheduleRetry(email: OutboundEmail, delaySeconds: number) {
   });
 }
 
+async function isSuppressed(address: string): Promise<boolean> {
+  const [row] = await db
+    .select({ address: suppressions.address })
+    .from(suppressions)
+    .where(eq(suppressions.address, address));
+  return row !== undefined;
+}
+
 ch.consume(QUEUE_OUTBOUND, async (msg) => {
   if (!msg) return;
   const email: OutboundEmail = JSON.parse(msg.content.toString());
@@ -71,10 +94,23 @@ ch.consume(QUEUE_OUTBOUND, async (msg) => {
 
   if (!route) {
     console.log(`[mta] ${email.id} no route for ${domain} → permanent`);
+    publishEvent({
+      type: 'delivery.attempted',
+      messageId: email.id,
+      attempt: email.attempt,
+      provider: 'none',
+      code: null,
+      enhancedCode: null,
+      response: `no route for ${domain}`,
+      outcome: 'permanent',
+      retryInSeconds: null,
+      status: 'bounced',
+    });
     return ch.ack(msg);
   }
-  if (suppression.has(email.to)) {
+  if (await isSuppressed(email.to)) {
     console.log(`[mta] ${email.id} ${email.to} is suppressed, dropping`);
+    publishEvent({ type: 'message.suppressed', messageId: email.id });
     return ch.ack(msg);
   }
 
@@ -105,30 +141,56 @@ ch.consume(QUEUE_OUTBOUND, async (msg) => {
   const outcome = classify(route.provider, raw, code);
   const tag = `[mta] ${email.id} → ${route.provider} attempt=${email.attempt}`;
 
+  let status: 'deferred' | 'delivered' | 'bounced' = 'deferred';
+  let retryInSeconds: number | null = null;
+
   switch (outcome.kind) {
     case 'delivered':
+      status = 'delivered';
       console.log(`${tag} DELIVERED`);
       break;
     case 'permanent':
+      status = 'bounced';
       console.log(`${tag} PERMANENT: ${outcome.message}`);
       if (shouldSuppress(outcome)) {
-        suppression.add(email.to);
+        publishEvent({
+          type: 'address.suppressed',
+          address: email.to,
+          reason: outcome.message,
+        });
         console.log(`[mta] suppressed ${email.to}`);
       }
       break;
     case 'transient': {
       const policy = policyFor(route.provider);
       if (email.attempt >= policy.maxAttempts) {
+        status = 'bounced';
         console.log(`
           ${tag} GAVE UP after ${email.attempt} attempts: ${outcome.message}`);
         break;
       }
-      const delay = nextDelaySeconds(policy, email.attempt);
-      console.log(`${tag} DEFERRED (${outcome.message}) → retry in ${delay}s`);
-      await scheduleRetry(email, delay);
+      status = 'deferred';
+      retryInSeconds = nextDelaySeconds(policy, email.attempt);
+      console.log(
+        `${tag} DEFERRED (${outcome.message}) → retry in ${retryInSeconds}s`,
+      );
+      await scheduleRetry(email, retryInSeconds);
       break;
     }
   }
+
+  publishEvent({
+    type: 'delivery.attempted',
+    messageId: email.id,
+    attempt: email.attempt,
+    provider: route.provider,
+    code: outcome.code,
+    enhancedCode: outcome.enhancedCode,
+    response: outcome.message,
+    outcome: outcome.kind,
+    retryInSeconds,
+    status,
+  });
 
   ch.ack(msg);
 });
