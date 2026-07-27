@@ -1,4 +1,6 @@
 import { SMTPServer } from 'smtp-server';
+import { eventPublisher } from '../shared/events.js';
+import { messageIdFrom } from './placement.js';
 
 /**
  * fake-gmail — an SMTP server that behaves like Gmail's edge, using real
@@ -26,6 +28,8 @@ const recentlyLimited = new Set<string>();
 
 export const inbox: { from: string; to: string; folder: 'inbox' | 'spam' }[] =
   [];
+
+const publishEvent = await eventPublisher('fake-gmail');
 
 function gsmtp(code: number, text: string) {
   const err = new Error(`${text} - gsmtp`) as Error & { responseCode: number };
@@ -82,15 +86,27 @@ const server = new SMTPServer({
     cb();
   },
   onData(stream, session, cb) {
-    stream.on('data', () => {});
+    const chunks: Buffer[] = [];
+    stream.on('data', (c: Buffer) => {
+      if (chunks.length < 64) chunks.push(c);
+    });
     stream.on('end', () => {
       const from = session.envelope.mailFrom
         ? session.envelope.mailFrom.address
         : '?';
+      const messageId = messageIdFrom(chunks);
       // 4. Accepted but possibly spam-foldered
       const folder = recentlyLimited.has(from) ? 'spam' : 'inbox';
       for (const rcpt of session.envelope.rcptTo) {
         inbox.push({ from, to: rcpt.address, folder });
+        publishEvent({
+          type: 'message.accepted',
+          messageId,
+          provider: 'fake-gmail',
+          from,
+          to: rcpt.address,
+          folder,
+        });
       }
       console.log(
         `[fake-gmail] accepted from=${from} → ${folder} (total stored: ${inbox.length})`,

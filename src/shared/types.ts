@@ -31,15 +31,31 @@ export interface RetryPolicy {
 
 export const QUEUE_OUTBOUND = 'emails.outbound';
 export const QUEUE_RETRY_PREFIX = 'emails.retry.'; // + delay bucket
-export const QUEUE_EVENTS = 'emails.events';
+export const EXCHANGE_EVENTS = 'emails.events'; // fanout
+export const QUEUE_EVENTS_WRITER = 'emails.events.writer';
+
+/** Header the MTA stamps on outgoing mail so providers can report inbox
+ *  placement back by message id — like real seed-list tracking. */
+export const MESSAGE_ID_HEADER = 'X-MTA-Message-Id';
 
 /**
- * Status events published by the API and the MTA, consumed by the writer —
- * the only process that writes to Postgres. The hot path never blocks on
- * the database; a Postgres outage delays bookkeeping, not delivery.
+ * Status events published by the API, the MTA and the providers to the
+ * emails.events fanout exchange. The writer — the only process that writes
+ * to Postgres — consumes them from its durable queue; the API relays the
+ * same stream to dashboards over SSE via an exclusive queue per client.
+ * The hot path never blocks on the database; a Postgres outage delays
+ * bookkeeping, not delivery.
  */
 export type StatusEvent =
   | { type: 'message.queued'; email: OutboundEmail }
+  | {
+      type: 'message.accepted';
+      messageId: string | null;
+      provider: string;
+      from: string;
+      to: string;
+      folder: 'inbox' | 'spam';
+    }
   | {
       type: 'delivery.attempted';
       messageId: string;

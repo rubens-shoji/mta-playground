@@ -1,4 +1,6 @@
 import { SMTPServer } from 'smtp-server';
+import { eventPublisher } from '../shared/events.js';
+import { messageIdFrom } from './placement.js';
 
 /**
  * fake-yahoo — an SMTP server that behaves like Yahoo's edge, using real
@@ -25,6 +27,8 @@ const RATE_LIMIT_PER_MIN = Number(process.env.YAHOO_RATE_LIMIT_PER_MIN ?? 20);
 const rateWindow = new Map<string, number[]>(); // sender -> timestamps
 
 export const inbox: { from: string; to: string; folder: 'inbox' }[] = [];
+
+const publishEvent = await eventPublisher('fake-yahoo');
 
 const slow = () => new Promise((r) => setTimeout(r, DELAY_MS));
 
@@ -74,14 +78,26 @@ const server = new SMTPServer({
     cb();
   },
   onData(stream, session, cb) {
-    stream.on('data', () => {});
+    const chunks: Buffer[] = [];
+    stream.on('data', (c: Buffer) => {
+      if (chunks.length < 64) chunks.push(c);
+    });
     stream.on('end', async () => {
       await slow();
       const from = session.envelope.mailFrom
         ? session.envelope.mailFrom.address
         : '?';
+      const messageId = messageIdFrom(chunks);
       for (const rcpt of session.envelope.rcptTo) {
         inbox.push({ from, to: rcpt.address, folder: 'inbox' });
+        publishEvent({
+          type: 'message.accepted',
+          messageId,
+          provider: 'fake-yahoo',
+          from,
+          to: rcpt.address,
+          folder: 'inbox',
+        });
       }
       console.log(
         `[fake-yahoo] accepted from=${from} (total stored: ${inbox.length})`,

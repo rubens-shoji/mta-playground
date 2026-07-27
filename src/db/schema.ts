@@ -64,6 +64,23 @@ export const deliveryAttempts = pgTable('delivery_attempts', {
     .defaultNow(),
 });
 
+export const placementFolder = pgEnum('placement_folder', ['inbox', 'spam']);
+
+/** Where accepted mail actually landed, as reported by the providers via
+ *  message.accepted events — accepted (250) ≠ inbox placement. message_id
+ *  is nullable: mail sent outside the MTA carries no id header. */
+export const placements = pgTable('placements', {
+  id: serial('id').primaryKey(),
+  messageId: uuid('message_id').references(() => messages.id),
+  provider: text('provider').notNull(),
+  from: text('from').notNull(),
+  to: text('to').notNull(),
+  folder: placementFolder('folder').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const suppressions = pgTable('suppressions', {
   address: text('address').primaryKey(),
   reason: text('reason').notNull(),

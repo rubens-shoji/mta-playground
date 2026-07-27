@@ -1,8 +1,17 @@
 import amqp from 'amqplib';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { deliveryAttempts, messages, suppressions } from '../db/schema.js';
-import { QUEUE_EVENTS, type StatusEvent } from '../shared/types.js';
+import {
+  deliveryAttempts,
+  messages,
+  placements,
+  suppressions,
+} from '../db/schema.js';
+import {
+  EXCHANGE_EVENTS,
+  QUEUE_EVENTS_WRITER,
+  type StatusEvent,
+} from '../shared/types.js';
 
 /**
  * Writer: the only process that writes to Postgres. Consumes status events
@@ -17,7 +26,9 @@ const AMQP_URL = process.env.AMQP_URL ?? 'amqp://guest:guest@localhost:5672';
 
 const conn = await amqp.connect(AMQP_URL);
 const ch = await conn.createChannel();
-await ch.assertQueue(QUEUE_EVENTS, { durable: true });
+await ch.assertExchange(EXCHANGE_EVENTS, 'fanout', { durable: true });
+await ch.assertQueue(QUEUE_EVENTS_WRITER, { durable: true });
+await ch.bindQueue(QUEUE_EVENTS_WRITER, EXCHANGE_EVENTS, '');
 ch.prefetch(1);
 
 async function handle(event: StatusEvent) {
@@ -59,6 +70,19 @@ async function handle(event: StatusEvent) {
       );
       break;
     }
+    case 'message.accepted': {
+      await db.insert(placements).values({
+        messageId: event.messageId,
+        provider: event.provider,
+        from: event.from,
+        to: event.to,
+        folder: event.folder,
+      });
+      console.log(
+        `[writer] placement: ${event.provider} → ${event.folder} (${event.to})`,
+      );
+      break;
+    }
     case 'message.suppressed': {
       await db
         .update(messages)
@@ -78,7 +102,7 @@ async function handle(event: StatusEvent) {
   }
 }
 
-ch.consume(QUEUE_EVENTS, async (msg) => {
+ch.consume(QUEUE_EVENTS_WRITER, async (msg) => {
   if (!msg) return;
   try {
     await handle(JSON.parse(msg.content.toString()) as StatusEvent);
@@ -89,4 +113,4 @@ ch.consume(QUEUE_EVENTS, async (msg) => {
   }
 });
 
-console.log('[writer] consuming', QUEUE_EVENTS);
+console.log('[writer] consuming', QUEUE_EVENTS_WRITER);

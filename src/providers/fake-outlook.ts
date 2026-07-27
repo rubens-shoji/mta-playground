@@ -1,4 +1,6 @@
 import { SMTPServer } from 'smtp-server';
+import { eventPublisher } from '../shared/events.js';
+import { messageIdFrom } from './placement.js';
 
 /**
  * fake-outlook — an SMTP server that behaves like Outlook.com's edge, using
@@ -25,6 +27,8 @@ const active = new Set<string>(); // session ids of accepted connections
 const rateWindow = new Map<string, number[]>(); // sender -> timestamps
 
 export const inbox: { from: string; to: string; folder: 'inbox' }[] = [];
+
+const publishEvent = await eventPublisher('fake-outlook');
 
 function reply(code: number, text: string) {
   const err = new Error(text) as Error & { responseCode: number };
@@ -97,13 +101,25 @@ const server = new SMTPServer({
       return destroySocket(session);
     }
 
-    stream.on('data', () => {});
+    const chunks: Buffer[] = [];
+    stream.on('data', (c: Buffer) => {
+      if (chunks.length < 64) chunks.push(c);
+    });
     stream.on('end', () => {
       const from = session.envelope.mailFrom
         ? session.envelope.mailFrom.address
         : '?';
+      const messageId = messageIdFrom(chunks);
       for (const rcpt of session.envelope.rcptTo) {
         inbox.push({ from, to: rcpt.address, folder: 'inbox' });
+        publishEvent({
+          type: 'message.accepted',
+          messageId,
+          provider: 'fake-outlook',
+          from,
+          to: rcpt.address,
+          folder: 'inbox',
+        });
       }
       console.log(
         `[fake-outlook] accepted from=${from} (total stored: ${inbox.length})`,

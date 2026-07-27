@@ -6,8 +6,8 @@ import { Hono } from 'hono';
 import { db } from '../db/client.js';
 import { deliveryAttempts, messages } from '../db/schema.js';
 import {
+  EXCHANGE_EVENTS,
   type OutboundEmail,
-  QUEUE_EVENTS,
   QUEUE_OUTBOUND,
   type StatusEvent,
 } from '../shared/types.js';
@@ -27,10 +27,10 @@ const AMQP_URL = process.env.AMQP_URL ?? 'amqp://guest:guest@localhost:5672';
 const conn = await amqp.connect(AMQP_URL);
 const ch = await conn.createChannel();
 await ch.assertQueue(QUEUE_OUTBOUND, { durable: true });
-await ch.assertQueue(QUEUE_EVENTS, { durable: true });
+await ch.assertExchange(EXCHANGE_EVENTS, 'fanout', { durable: true });
 
 function publishEvent(event: StatusEvent) {
-  ch.sendToQueue(QUEUE_EVENTS, Buffer.from(JSON.stringify(event)), {
+  ch.publish(EXCHANGE_EVENTS, '', Buffer.from(JSON.stringify(event)), {
     persistent: true,
   });
 }
@@ -87,6 +87,9 @@ app.get('/messages/:id', async (c) => {
   return c.json({ ...message, attempts });
 });
 
+
 serve({ fetch: app.fetch, port: 3000 }, () =>
-  console.log('[api] listening on :3000 — POST /send, GET /messages[/:id]'),
+  console.log(
+    '[api] listening on :3000 — POST /send, GET /messages[/:id]',
+  ),
 );

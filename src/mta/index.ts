@@ -4,8 +4,9 @@ import nodemailer from 'nodemailer';
 import { db } from '../db/client.js';
 import { suppressions } from '../db/schema.js';
 import {
+  EXCHANGE_EVENTS,
+  MESSAGE_ID_HEADER,
   type OutboundEmail,
-  QUEUE_EVENTS,
   QUEUE_OUTBOUND,
   QUEUE_RETRY_PREFIX,
   type StatusEvent,
@@ -54,11 +55,11 @@ const ROUTES: Record<string, { provider: string; host: string; port: number }> =
 const conn = await amqp.connect(AMQP_URL);
 const ch = await conn.createChannel();
 await ch.assertQueue(QUEUE_OUTBOUND, { durable: true });
-await ch.assertQueue(QUEUE_EVENTS, { durable: true });
+await ch.assertExchange(EXCHANGE_EVENTS, 'fanout', { durable: true });
 ch.prefetch(5);
 
 function publishEvent(event: StatusEvent) {
-  ch.sendToQueue(QUEUE_EVENTS, Buffer.from(JSON.stringify(event)), {
+  ch.publish(EXCHANGE_EVENTS, '', Buffer.from(JSON.stringify(event)), {
     persistent: true,
   });
 }
@@ -130,6 +131,7 @@ ch.consume(QUEUE_OUTBOUND, async (msg) => {
       to: email.to,
       subject: email.subject,
       text: email.body,
+      headers: { [MESSAGE_ID_HEADER]: email.id },
     });
     raw = info.response;
     code = 250;
