@@ -9,6 +9,8 @@ other ways real providers make delivery hard.
 
 Built to explore the problem space, not to send real email.
 
+![postmaster console — live delivery dashboard](docs/dashboard.gif)
+
 ## Purpose
 
 Email delivery looks simple (SMTP is from 1982) and is brutally hard in
@@ -71,12 +73,19 @@ compressed so a demo run is watchable in minutes instead of days.
                           │ queues    │   │ fake-outlook ...│
                           └───────────┘   └─────────────────┘
 
-              persistence (event-driven, single writer)
-┌──────────┐         ┌───────────────┐   ┌────────┐   ┌──────────┐
-│ api, mta │ ──────→ │ emails.events │ → │ writer │ → │ Postgres │
-└──────────┘ status  └───────────────┘   └────────┘   └────┬─────┘
-              events                                       │ reads
-                          api (GET /messages), mta (suppression list)
+           events & persistence (fanout, single writer)
+┌─────────────────────┐        ┌───────────────┐
+│ api, mta, providers │ ─────→ │ emails.events │  fanout exchange
+└─────────────────────┘ status └───┬───────┬───┘
+                        events     │       │ exclusive queue per client
+                          ┌────────┴─┐   ┌─┴────────────┐
+                          │ writer   │   │ api /events  │ → dashboard :5173
+                          │ queue    │   │ (SSE relay)  │   (React + Vite)
+                          └────┬─────┘   └──────────────┘
+                               ↓
+                          ┌──────────┐    reads: api (GET /messages, /stats)
+                          │ Postgres │ ←         mta (suppression list)
+                          └──────────┘
 ```
 
 - **API never talks SMTP.** A provider slowdown can't block ingestion; the
@@ -91,11 +100,19 @@ compressed so a demo run is watchable in minutes instead of days.
 - **Suppression is recipient-level only.** A 5.7.x reputation block means
   the sender is the problem, not the address — suppressing it would be a
   bug. See `shouldSuppress()`.
-- **Writes are events, not queries.** The API and MTA never write to
-  Postgres on the hot path: they publish status events to `emails.events`
-  and the writer process (the only DB writer) does the bookkeeping. A
-  Postgres outage delays history, not delivery. One queue, one consumer →
-  FIFO, so an attempt never arrives before its message row.
+- **Writes are events, not queries.** The API, MTA and providers never
+  write to Postgres on the hot path: they publish status events to the
+  `emails.events` fanout exchange and the writer process (the only DB
+  writer) does the bookkeeping from its durable queue. A Postgres outage
+  delays history, not delivery. One durable queue, one consumer → FIFO, so
+  an attempt never arrives before its message row. The same stream feeds
+  the dashboard: each SSE client taps the exchange through its own
+  exclusive queue.
+- **Placement is reported by the receiver.** The MTA stamps outgoing mail
+  with `X-MTA-Message-Id`; providers read it from DATA and publish
+  `message.accepted` with the folder it landed in — accepted (250) ≠ inbox,
+  and the dashboard's inbox-vs-spam panel is built from these events, like
+  real seed-list tracking.
 
 ## Provider behaviors
 
@@ -111,7 +128,8 @@ compressed so a demo run is watchable in minutes instead of days.
 docker compose up -d        # RabbitMQ (:15672 UI) + Postgres (:5433)
 pnpm install
 pnpm db:push                # create the tables
-pnpm dev                    # api :3000, mta, writer, providers :2525-2527
+pnpm dev                    # api :3000, mta, writer, providers :2525-2527,
+                            # dashboard :5173
 ```
 
 Send something:
@@ -134,6 +152,10 @@ including every 421 and the raw provider responses:
 curl localhost:3000/messages          # latest 50, status only
 curl localhost:3000/messages/<id>     # one message + its delivery attempts
 ```
+
+Or watch it live: open http://localhost:5173 — the postmaster console shows
+queue depths, outcomes, inbox-vs-spam placement and a live event wire, with
+each message row expanding into its full attempt timeline.
 
 Standalone greylisting demo (no RabbitMQ needed):
 
@@ -159,7 +181,7 @@ dropped connections.
 - [x] Phase 3: persistence with Postgres + Drizzle — store messages and
       delivery attempts, tracking execution status per message (queued,
       deferred, delivered, bounced, suppressed)
-- [ ] Phase 4: live dashboard (queues, attempts, outcomes, inbox vs spam)
+- [x] Phase 4: live dashboard (queues, attempts, outcomes, inbox vs spam)
 - [ ] Phase 5: per-IP reputation score consulted by providers; warmup demo
 
 ## Open questions
