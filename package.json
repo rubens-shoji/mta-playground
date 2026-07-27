@@ -14,6 +14,7 @@
     "outlook": "tsx --env-file=.env src/providers/fake-outlook.ts",
     "yahoo": "tsx --env-file=.env src/providers/fake-yahoo.ts",
     "dash": "pnpm --dir dashboard dev",
+    "loop-test": "tsx src/loop-test.ts",
     "dev": "concurrently -n api,mta,writer,gmail,outlook,yahoo,dash -c blue,green,red,yellow,magenta,cyan,white \"npm:api\" \"npm:mta\" \"npm:writer\" \"npm:gmail\" \"npm:outlook\" \"npm:yahoo\" \"npm:dash\"",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
