@@ -1,0 +1,455 @@
+/* The palette is the protocol: every color derives from SMTP reply-code
+   semantics — 2xx ok, 4xx defer, 5xx fail — plus queued and suppressed.
+   No decorative accent; the semantics are the accents. */
+:root {
+  --bg: #0e131b;
+  --panel: #141b26;
+  --hairline: #22293a;
+  --text: #d9e2ec;
+  --muted: #7b8698;
+  --ok: #43d17c;
+  --defer: #e2ab4a;
+  --fail: #e2604e;
+  --queued: #5da4e0;
+  --supp: #a488d9;
+  --drop: #8a93a3;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --sans: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.console {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-rows: auto 1fr;
+  gap: 20px;
+  padding: 24px;
+  min-height: 100vh;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* ── masthead ─────────────────────────────────────────────── */
+
+.masthead {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 14px;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.masthead h1 {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.feed {
+  font-family: var(--mono);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feed-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.feed-live {
+  color: var(--ok);
+}
+
+.feed-live .feed-dot {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.feed-down {
+  color: var(--fail);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ── board ────────────────────────────────────────────────── */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.panel-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.empty code {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* ── outcomes ─────────────────────────────────────────────── */
+
+.outcomes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 10px;
+}
+
+.outcome dt {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+.outcome dd {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── queues + placements ──────────────────────────────────── */
+
+.queues,
+.placements {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.queues li,
+.placements li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.queue-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-bar-track,
+.placement-track {
+  height: 6px;
+  background: var(--hairline);
+  border-radius: 3px;
+  overflow: hidden;
+  display: flex;
+}
+
+.queue-bar {
+  background: var(--queued);
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.placement-inbox {
+  background: var(--ok);
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.placement-spam {
+  background: var(--defer);
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.queue-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  min-width: 3ch;
+  text-align: right;
+}
+
+/* ── messages table ───────────────────────────────────────── */
+
+.messages table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.messages th {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.messages td {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.row {
+  cursor: pointer;
+}
+
+.row:hover,
+.row-open {
+  background: color-mix(in srgb, var(--panel) 60%, var(--bg));
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--queued);
+  outline-offset: -2px;
+}
+
+.chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid;
+}
+
+.chip-queued {
+  color: var(--queued);
+  border-color: color-mix(in srgb, var(--queued) 45%, transparent);
+}
+
+.chip-deferred {
+  color: var(--defer);
+  border-color: color-mix(in srgb, var(--defer) 45%, transparent);
+}
+
+.chip-delivered {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+}
+
+.chip-bounced {
+  color: var(--fail);
+  border-color: color-mix(in srgb, var(--fail) 45%, transparent);
+}
+
+.chip-suppressed {
+  color: var(--supp);
+  border-color: color-mix(in srgb, var(--supp) 45%, transparent);
+}
+
+.detail-row td {
+  white-space: normal;
+  max-width: none;
+  background: var(--bg);
+  padding: 14px 16px;
+}
+
+/* ── attempt timeline ─────────────────────────────────────── */
+
+.timeline {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attempt {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.attempt-head {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.attempt-response {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+/* ── event wire (signature) ───────────────────────────────── */
+
+.wire {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 16px;
+  overflow-y: auto;
+  max-height: calc(100vh - 110px);
+  position: sticky;
+  top: 24px;
+}
+
+.wire-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wire-line {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: 12px;
+  animation: land 0.25s ease;
+}
+
+@keyframes land {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.wire-line time {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wire-tag {
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid;
+  border-radius: 4px;
+  padding: 0 5px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.wire-text {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.tone-ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+}
+
+.tone-defer {
+  color: var(--defer);
+  border-color: color-mix(in srgb, var(--defer) 45%, transparent);
+}
+
+.tone-fail {
+  color: var(--fail);
+  border-color: color-mix(in srgb, var(--fail) 45%, transparent);
+}
+
+.tone-queued {
+  color: var(--queued);
+  border-color: color-mix(in srgb, var(--queued) 45%, transparent);
+}
+
+.tone-supp {
+  color: var(--supp);
+  border-color: color-mix(in srgb, var(--supp) 45%, transparent);
+}
+
+.tone-drop {
+  color: var(--drop);
+  border-color: color-mix(in srgb, var(--drop) 45%, transparent);
+}
+
+/* ── responsive + reduced motion ──────────────────────────── */
+
+@media (max-width: 980px) {
+  .console {
+    grid-template-columns: 1fr;
+  }
+
+  .wire {
+    position: static;
+    max-height: 320px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wire-line,
+  .feed-live .feed-dot {
+    animation: none;
+  }
+
+  .queue-bar,
+  .placement-inbox,
+  .placement-spam {
+    transition: none;
+  }
+}
