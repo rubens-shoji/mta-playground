@@ -30,21 +30,21 @@
   "dependencies": {
     "@hono/node-server": "2.0.11",
     "amqplib": "2.0.1",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "0.45.2",
     "hono": "4.12.32",
     "nodemailer": "9.0.3",
-    "pg": "^8.22.0",
+    "pg": "8.22.0",
     "smtp-server": "3.19.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.5",
+    "@biomejs/biome": "2.5.5",
     "@types/amqplib": "0.10.8",
     "@types/node": "26.1.1",
     "@types/nodemailer": "8.0.1",
-    "@types/pg": "^8.20.0",
+    "@types/pg": "8.20.0",
     "@types/smtp-server": "3.5.13",
     "concurrently": "10.0.3",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "0.31.10",
     "tsx": "4.23.1",
     "typescript": "7.0.2",
     "vitest": "4.1.10"
